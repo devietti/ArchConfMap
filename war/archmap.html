@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <!-- 
+    This code is part of the Architecture and Compilers Conference Map webpage.
+    Copyright (C) 2011 University of Washington
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+    README: http://linuxforlovers.wordpress.com/2011/03/30/new-computer-architecturecompilers-conference-map/ 
+
+    -->
+    <title>Computer Architecture and Compilers Conference Map</title>
+    <link rel="stylesheet" type="text/css" href="arch.css" />
+    <script src="http://maps.google.com/maps/api/js?v=3&amp;sensor=false" type="text/javascript"></script>
+    <script type="text/javascript" src="jquery-1.5.1.min.js"></script>
+    <script type="text/javascript" src="purl.js"></script>
+    <script type="text/javascript" src="json2.js"></script>
+    
+    <script type="text/javascript">
+// google analytics stuff
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-20813990-2']);
+_gaq.push(['_trackPageview']);
+
+(function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+    </script>
+
+    <script type="text/javascript">
+        var map; 
+        var geocoder;
+        var list;
+
+        function onLoad() {
+           showMap();
+           readConfData();
+        }
+  
+        function showMap() {
+            var mapOptions = { center: new google.maps.LatLng(0,0),
+                               zoom: 1,
+                               mapTypeControl: true,
+                               mapTypeId: google.maps.MapTypeId.ROADMAP,
+                               streetViewControl: false,
+                               navigationControl: true,
+                               navigationControlOptions: { style: google.maps.NavigationControlStyle.SMALL,
+                                                           position: google.maps.ControlPosition.TOP_LEFT }
+                             };
+            map = new google.maps.Map(document.getElementById("map"), mapOptions);
+            geocoder = new google.maps.Geocoder();
+        }
+
+        function readConfData() {
+          $.getJSON("http://localhost:8888/archconfmap?req=confs", {},
+                     function(data) {
+                       if ($.isArray(data) ) {
+                         for (var i = 0; i < data.length; i++) {
+                             addConf(data[i].name, data[i].dates, data[i].url, 
+                                     data[i].eventid, data[i].location, data[i].deadline, 
+                                     data[i].deadlineStatus);
+                         }
+                       } else {
+                         if ($.url().param("debug")) alert("web service call failed, returning: " + data);
+                       }
+                     });
+        }
+
+        function normalizeLocation(addressComponents) {
+            // pull out the "city" and "country" names
+            var city = null;
+            var country = null;
+            for ( var i = 0; i < addressComponents.length; i++ ) {
+                var comp = addressComponents[i];
+                if ( $.inArray("political", comp.types) < 0 ) continue;
+                
+                // the notion of a "city" can show up in a few different ways in the geocoder
+                if ( city == null && 
+                     ($.inArray("locality", comp.types) > -1 || 
+                      $.inArray("administrative_area_level_2", comp.types) > -1) ) {
+                    city = comp.long_name;
+                }
+                if ( $.inArray("country", comp.types) > -1 ) {
+                    country = comp.long_name;
+                }
+            }
+            if ( city != null && country != null ) {
+                return city + ", " + country;
+            }
+            if ($.url().param("debug")) alert( JSON.stringify(addressComponents,1) );
+            return null;
+        }
+
+        function addConf(name, dates, url, wikicfpEventId, loc, dl, due) {
+            geocoder.geocode( { 'address': loc}, function(results, status) {
+                if (status == google.maps.GeocoderStatus.OK) {
+                    
+                    // normalize location to the form "city, country"
+                    var normalizedLoc = normalizeLocation( results[0].address_components );
+                    if ( normalizedLoc != null ) loc = normalizedLoc;
+
+                    // create map marker
+                    var marker = new google.maps.Marker({
+                        map: map, 
+                        position: results[0].geometry.location,
+                        icon: due+"-due.png"
+                    });
+
+                    // no more than one popup should be visible at a time
+                    visiblePopup = null;
+
+                    // create map marker pop-up window
+                    var popup = new google.maps.InfoWindow();
+                    google.maps.event.addListener( marker, 'mouseover', function() {
+                        /* Copy the link to the actual conference site from
+                           elsewhere in the DOM.  Hack: the link should be
+                           resolved by the time this event handler fires. If
+                           not, we'll get a link to the WikiCFP page instead.
+                        */
+                        var mainLink = document.getElementById( 'mainLink'+wikicfpEventId );
+
+                        var html = "<div style=\"width: 12em\"";
+                        html += "<b><a href=\"" + mainLink.href +"\">" + name + "</a></b><br>";
+                        html += loc + "<br>";
+                        html += dates + "<br>";
+                        html += "due: " + dl;
+                        html += "</div>";
+                        popup.setContent( html );
+
+                        if ( visiblePopup != null ) visiblePopup.close();
+                        popup.open( map, marker );
+                        visiblePopup = popup;
+                    });
+
+                    // now add info to list
+                    var list;
+                    if(/pre/i.exec(due) == "pre") {
+                        list = 'conflisto';
+                    } else {
+                        list = 'conflistc';
+                    }
+                    
+                    insertTagInList(list, url, name, wikicfpEventId);
+                    insertLineBreak(list);
+                    insertTextInList(list, loc);
+                    insertLineBreak(list);
+                    insertTextInList(list, dates);
+                    insertLineBreak(list);
+                    insertTextInList(list, "due: " + dl);
+                    insertLineBreak(list);
+                    insertLineBreak(list);
+
+                } else {
+                  if ($.url().param("debug")) alert("Geocode was not successful for the following reason: " + status);
+                }
+            }); // end geocoding request handler
+
+        } // end addConf()
+
+        function insertTagInList(list, el, et, eid) {
+           var conflist = document.getElementById(list);
+           var extratag = document.createElement('a');
+           conflist.appendChild(extratag);
+           var extratext = document.createTextNode(et);
+           extratag.appendChild(extratext);
+           extratag.href = el;
+           extratag.id = 'mainLink'+eid;
+
+           // in the background, rewrite links to go to the actual conference site using our simple web service
+           $.getJSON("http://localhost:8888/archconfmap?req=conflink&eventid="+eid, {},
+                     function(data) {
+                       if ( typeof data == "string" ) {
+                         var a = document.getElementById('mainLink'+eid);
+                         a.href = data;
+                       } else {
+                         if ($.url().param("debug")) alert("web service call failed, returning: " + data);
+                       }
+                     }); 
+        }
+
+        function insertTextInList(list, et) {
+           var conflist = document.getElementById(list);
+           var extratext = document.createTextNode(et);
+           conflist.appendChild(extratext);
+        }       
+
+        function insertLineBreak(list) {
+           var conflist = document.getElementById(list);
+           var extraline = document.createElement('br');
+           conflist.appendChild(extraline);
+        }
+
+        function insertComma(list) {
+           var conflist = document.getElementById(list);
+           var extratext = document.createTextNode(", ");
+           conflist.appendChild(extratext);
+        }
+
+        </script>
+</head>
+<body onload="onLoad()">
+  
+  <div id="content">  
+    
+    <div id="main-title">Computer Architecture and Compilers Conference Map</div>
+    
+    <div id="main-text">
+      
+      <p> Check the map for upcoming computer architecture and compiler conferences. </p>
+
+    <p>The data for this map is generated automatically from the calls for
+ papers at <a href="http://www.wikicfp.com">WikiCFP</a> for the <span
+ id="ConfNames"></span> conferences. If the current call for papers is missing,
+ please consider uploading it to <a
+  href="http://www.wikicfp.com">WikiCFP</a>.</p>
+      
+<script>
+ $.getJSON("http://localhost:8888/archconfmap?req=names", {},
+   function(data) {
+     if ( $.isArray(data) ) {
+       var cn = document.getElementById("ConfNames");
+       var last = data.pop();
+       var text = document.createTextNode( data.join(", ") + " and " + last );
+       cn.appendChild(text);
+     } else {
+       if ($.url().param("debug")) alert("web service call failed, returning: " + data);
+     }
+   });
+</script>
+      
+    <p>If you would like to see a new conference being tracked, please ensure the call for papers is posted at <a href="http://www.wikicfp.com">WikiCFP</a> and then send an email to ca.confs --a-t-- gmail-dot-com and we will update the list of conferences we track.</p>
+
+      <!--p>Now, quick, go back to work! </p-->
+      <div id="legend">
+        <img src="pre-due.png"> = future deadline
+        <img src="post-due.png"> = future conference, deadline has passed
+        <br>
+      </div>
+
+      <div id="map" style="width: 600px; height: 350px;"></div>
+
+      <div id="credits">Developed by <a href='http://www.cs.washington.edu/homes/luisceze'>Luis Ceze</a>, <a href='http://www.cs.washington.edu/homes/kstrauss'>Karin Strauss</a> and <a href="http://www.cis.upenn.edu/~devietti/">Joe Devietti</a>. The source code for this page is available <a href='arch-compilers-map-v0.tar.gz'>here</a>.</div>
+      
+      <div>
+        <br><b>Upcoming Conferences (sorted by start date):</b><br>
+
+        <table>
+          <tr>
+            <td style="vertical-align:top">
+              <div id='conflisto'> <br>
+                <b> Open submissions: </b><br><br>
+              </div>
+            </td>
+
+            <td style="vertical-align:top">
+              <div id='conflistc'> <br>
+                <b> Closed submissions: </b><br><br>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
+              
+    </div> <!-- end of main-text -->
+    <div id="lower-bar"></div>
+    <div id="horiz-space"></div>
+  </div> <!-- end of content -->
+</body>
+</html>
