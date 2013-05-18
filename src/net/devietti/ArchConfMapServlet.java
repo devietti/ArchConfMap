@@ -214,7 +214,8 @@ public class ArchConfMapServlet extends HttpServlet {
 
       Elements rows = doc.select("div[class=contsec] table table tr");
       for ( Iterator<Element> iter = rows.iterator(); iter.hasNext(); ) {
-         Elements confName = iter.next().select("td a");
+         final Element firstRow = iter.next();
+         final Elements confName = firstRow.select("td a");
          if ( confName.isEmpty() ) continue;
 
          final Conf conf = new Conf();
@@ -223,6 +224,15 @@ public class ArchConfMapServlet extends HttpServlet {
          String cn = confName.first().text().split(" ")[0];
          int found = Arrays.binarySearch(CONFERENCE_NAMES, cn);
          if ( found < 0 ) continue; // not found
+         
+         // don't match other ICS conferences, eg Information, Communication, Society
+         if ( CONFERENCE_NAMES[found].equals("ICS") ) {
+            String confFullName = firstRow.select("td").get(1).text();
+            if (!confFullName.toLowerCase().contains("supercomputing")) {
+               continue; // found some other ICS conference
+            }
+         }
+         
          conf.name = confName.first().text();
 
          /*
@@ -231,8 +241,8 @@ public class ArchConfMapServlet extends HttpServlet {
           * in the second.
           */
 
-         Element nextRow = iter.next();
-         String dates = nextRow.select("td").first().text();
+         final Element secondRow = iter.next();
+         String dates = secondRow.select("td").first().text();
          String startDate = dates.substring(0, dates.indexOf('-')).trim();
          conf.start = cfpDateFormat.parseDateTime(startDate);
          conf.end = cfpDateFormat.parseDateTime(dates.substring(dates.indexOf('-') + 1).trim());
@@ -244,7 +254,7 @@ public class ArchConfMapServlet extends HttpServlet {
                          + dayFormat.print(conf.end) + " " + yearFormat.print(conf.start);
          }
 
-         String deadline = nextRow.select("td").get(2).text().trim();
+         String deadline = secondRow.select("td").get(2).text().trim();
          if ( deadline.contains("(") ) { // abstract deadline may be in parentheses
             deadline = deadline.substring(0, deadline.indexOf('(')).trim();
          }
@@ -266,7 +276,7 @@ public class ArchConfMapServlet extends HttpServlet {
             continue;
          }
 
-         conf.location = nextRow.select("td").get(1).text();
+         conf.location = secondRow.select("td").get(1).text();
 
          results.add(conf);
       }
