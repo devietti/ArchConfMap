@@ -47,6 +47,8 @@ _gaq.push(['_trackPageview']);
         var map; 
         var geocoder;
         var list;
+        var SERVER = "http://archconfmap.appspot.com/";
+        //var SERVER = "http://localhost:8888/";
 
         function onLoad() {
            showMap();
@@ -68,7 +70,7 @@ _gaq.push(['_trackPageview']);
         }
 
         function readConfData() {
-          $.getJSON("http://localhost:8888/archconfmap?req=confs", {},
+          $.getJSON(SERVER+"archconfmap?req=confs", {},
                      function(data) {
                        if ($.isArray(data) ) {
                          for (var i = 0; i < data.length; i++) {
@@ -183,7 +185,7 @@ _gaq.push(['_trackPageview']);
            extratag.id = 'mainLink'+eid;
 
            // in the background, rewrite links to go to the actual conference site using our simple web service
-           $.getJSON("http://localhost:8888/archconfmap?req=conflink&eventid="+eid, {},
+           $.getJSON(SERVER+"archconfmap?req=conflink&eventid="+eid, {},
                      function(data) {
                        if ( typeof data == "string" ) {
                          var a = document.getElementById('mainLink'+eid);
@@ -231,7 +233,7 @@ _gaq.push(['_trackPageview']);
   href="http://www.wikicfp.com">WikiCFP</a>.</p>
       
 <script>
- $.getJSON("http://localhost:8888/archconfmap?req=names", {},
+ $.getJSON(SERVER+"archconfmap?req=names", {},
    function(data) {
      if ( $.isArray(data) ) {
        var cn = document.getElementById("ConfNames");
