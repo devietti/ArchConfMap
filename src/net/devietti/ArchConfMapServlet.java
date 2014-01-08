@@ -225,11 +225,17 @@ public class ArchConfMapServlet extends HttpServlet {
          int found = Arrays.binarySearch(CONFERENCE_NAMES, cn);
          if ( found < 0 ) continue; // not found
          
+         final String confFullName = firstRow.select("td").get(1).text();
          // don't match other ICS conferences, eg Information, Communication, Society
          if ( CONFERENCE_NAMES[found].equals("ICS") ) {
-            String confFullName = firstRow.select("td").get(1).text();
             if (!confFullName.toLowerCase().contains("supercomputing")) {
-               continue; // found some other ICS conference
+               continue;
+            }
+         }
+         // don't match other CC conferences, eg Creative Construction
+         if ( CONFERENCE_NAMES[found].equals("CC") ) {
+            if (!confFullName.toLowerCase().contains("compiler")) {
+               continue;
             }
          }
          
