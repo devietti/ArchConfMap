@@ -25,10 +25,13 @@
     -->
     <title>Computer Architecture and Compilers Conference Map</title>
     <link rel="stylesheet" type="text/css" href="arch.css" />
-    <script src="http://maps.google.com/maps/api/js?v=3&amp;sensor=false" type="text/javascript"></script>
+    <script src="http://maps.google.com/maps/api/js?v=3&amp;key=AIzaSyBqGS7FyToC8YFGUPgZSDy_2Pxg8pwU590" type="text/javascript"></script>
     <script type="text/javascript" src="jquery-1.5.1.min.js"></script>
     <script type="text/javascript" src="purl.js"></script>
     <script type="text/javascript" src="json2.js"></script>
+
+    <!-- AWS JavaScript SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.20.min.js"></script>
     
     <script type="text/javascript">
 // google analytics stuff
@@ -47,12 +50,11 @@ _gaq.push(['_trackPageview']);
         var map; 
         var geocoder;
         var list;
-        var SERVER = "http://archconfmap.appspot.com/";
-        //var SERVER = "http://localhost:8888/";
 
         function onLoad() {
            showMap();
-           readConfData();
+            readConfData();
+            if ($.url().param("rebuild")) { rebuildPage(); }
         }
   
         function showMap() {
@@ -70,18 +72,7 @@ _gaq.push(['_trackPageview']);
         }
 
         function readConfData() {
-          $.getJSON(SERVER+"archconfmap?req=confs", {},
-                     function(data) {
-                       if ($.isArray(data) ) {
-                         for (var i = 0; i < data.length; i++) {
-                             addConf(data[i].name, data[i].dates, data[i].url, 
-                                     data[i].eventid, data[i].location, data[i].deadline, 
-                                     data[i].deadlineStatus);
-                         }
-                       } else {
-                         if ($.url().param("debug")) alert("web service call failed, returning: " + data);
-                       }
-                     });
+            %%ADDCONFCALLS%%
         }
 
         function normalizeLocation(addressComponents) {
@@ -183,17 +174,6 @@ _gaq.push(['_trackPageview']);
            extratag.appendChild(extratext);
            extratag.href = el;
            extratag.id = 'mainLink'+eid;
-
-           // in the background, rewrite links to go to the actual conference site using our simple web service
-           $.getJSON(SERVER+"archconfmap?req=conflink&eventid="+eid, {},
-                     function(data) {
-                       if ( typeof data == "string" ) {
-                         var a = document.getElementById('mainLink'+eid);
-                         a.href = data;
-                       } else {
-                         if ($.url().param("debug")) alert("web service call failed, returning: " + data);
-                       }
-                     }); 
         }
 
         function insertTextInList(list, et) {
@@ -214,6 +194,39 @@ _gaq.push(['_trackPageview']);
            conflist.appendChild(extratext);
         }
 
+        /** Call AWS Lambda function which rebuilds this page */
+        function rebuildPage() {
+            var REGION = 'us-east-1';
+            AWS.config.update({region: REGION});
+            AWS.config.credentials = new AWS.CognitoIdentityCredentials(
+                {IdentityPoolId: 'us-east-1:611a5a0c-65d7-4042-9fca-4396f5346504'});
+
+            var lambda = new AWS.Lambda({region: REGION, apiVersion: '2015-03-31'});
+
+            // create JSON object for parameters
+            var params = {
+                FunctionName : 'ArchConfMap',
+                InvocationType : 'RequestResponse',
+                LogType : 'None',
+                Payload : ""
+            };
+
+            var msg = "Sending request for " + JSON.stringify(params.Payload) + " ...";
+            console.log(msg);
+
+            // create variable to hold data returned by the Lambda function
+            lambda.invoke(params, function(error, data) {
+                if (error) {
+                    alert("ERROR: " + error);
+                } else {
+                    var results = JSON.parse(data.Payload);
+                    var msg = "Lambda response: " + JSON.stringify(results);
+                    console.log(msg);
+                    alert(msg);
+                }
+            });
+        }
+
         </script>
 </head>
 <body onload="onLoad()">
@@ -228,24 +241,10 @@ _gaq.push(['_trackPageview']);
 
     <p>The data for this map is generated automatically from the calls for
  papers at <a href="http://www.wikicfp.com">WikiCFP</a> for the <span
- id="ConfNames"></span> conferences. If the current call for papers is missing,
+ id="ConfNames">%%CONFNAMES%%</span> conferences. If the current call for papers is missing,
  please consider uploading it to <a
   href="http://www.wikicfp.com">WikiCFP</a>.</p>
-      
-<script>
- $.getJSON(SERVER+"archconfmap?req=names", {},
-   function(data) {
-     if ( $.isArray(data) ) {
-       var cn = document.getElementById("ConfNames");
-       var last = data.pop();
-       var text = document.createTextNode( data.join(", ") + " and " + last );
-       cn.appendChild(text);
-     } else {
-       if ($.url().param("debug")) alert("web service call failed, returning: " + data);
-     }
-   });
-</script>
-      
+            
     <p>If you would like to see a new conference being tracked, please ensure the call for papers is posted at <a href="http://www.wikicfp.com">WikiCFP</a> and then send an email to ca.confs --a-t-- gmail-dot-com and we will update the list of conferences we track.</p>
 
       <!--p>Now, quick, go back to work! </p-->
