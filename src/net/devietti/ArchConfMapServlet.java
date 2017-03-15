@@ -57,7 +57,7 @@ public class ArchConfMapServlet extends HttpServlet {
    private final static Gson     GSON;
 
    final private static String[] CONFERENCE_NAMES = { "ISCA", "HPCA", "MICRO", "ASPLOS", "PLDI",
-         "CGO", "SPLASH", "PPoPP", "ICS", "PACT", "ICPP", "CC" };
+         "CGO", "SPLASH", "PPoPP", "ICS", "PACT", "ICPP", "CC", "WIVOSCA" };
 
    static {
       Arrays.sort(CONFERENCE_NAMES);
